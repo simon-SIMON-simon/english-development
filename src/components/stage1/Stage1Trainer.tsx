@@ -74,6 +74,32 @@ export default function Stage1Trainer({
     };
   }, []);
 
+  // スペースキーによる開始 & 次のチャンク遷移ショートカット
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      const isTypingField = targetTag === "INPUT" || targetTag === "TEXTAREA";
+
+      if (e.code === "Space" || e.key === " ") {
+        if (phaseState === "ready") {
+          e.preventDefault();
+          startTrial();
+        } else if (phaseState === "result" && !isTypingField) {
+          e.preventDefault();
+          handleNext();
+        }
+      } else if (e.key === "Enter" && phaseState === "result" && !isTypingField) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [phaseState, currentChunk]);
+
   if (!currentChunk) {
     return (
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center">
@@ -294,11 +320,17 @@ export default function Stage1Trainer({
             <button
               type="button"
               onClick={startTrial}
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-8 py-4 text-base font-bold text-white shadow-lg hover:bg-cyan-500 transition cursor-pointer"
+              className="inline-flex items-center gap-2.5 rounded-xl bg-cyan-600 px-8 py-4 text-base font-bold text-white shadow-lg hover:bg-cyan-500 transition cursor-pointer"
             >
               <Volume2 className="w-5 h-5" />
               音声知覚 & 3000ms検索を開始する
+              <span className="rounded-lg bg-slate-950/40 border border-white/20 px-2.5 py-1 text-xs font-mono font-medium text-cyan-200">
+                Space
+              </span>
             </button>
+            <div className="text-xs text-slate-500 font-mono">
+              キーボードの <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-300">Space</kbd> キーでも直接開始できます
+            </div>
           </div>
         )}
 
@@ -525,6 +557,9 @@ export default function Stage1Trainer({
                 className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-cyan-500 cursor-pointer"
               >
                 次のチャンクへ
+                <span className="rounded-md bg-slate-950/40 border border-white/20 px-2 py-0.5 text-[10px] font-mono text-cyan-200">
+                  Space
+                </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
