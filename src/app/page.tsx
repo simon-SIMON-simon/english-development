@@ -106,9 +106,12 @@ export default function SEPAppPage() {
     setChunks(updated);
   };
 
-  const handleStartWorkoutWithSet = (setId: LearningSetId) => {
+  const handleStartWorkoutWithSet = (
+    setId: LearningSetId,
+    phase: 1 | 2 | 3 = 1
+  ) => {
     setSelectedSetFilter(setId);
-    setWorkoutPhase(1);
+    setWorkoutPhase(phase);
     setWorkoutElapsedSec(0);
     setActiveTab("daily_workout");
   };
@@ -134,9 +137,10 @@ export default function SEPAppPage() {
       ? chunks
       : chunks.filter((c) => c.sourceSet === selectedSetFilter);
 
-  const stage1Count = filteredChunks.filter((c) => c.stage === 1).length;
-  const stage2Count = filteredChunks.filter((c) => c.stage === 2).length;
-  const stage3Count = filteredChunks.filter((c) => c.stage === 3).length;
+  // すべての表現がすべてのPhase (Stage 1 / Stage 2 / Stage 3) で利用可能
+  const stage1Count = filteredChunks.length;
+  const stage2Count = filteredChunks.length;
+  const stage3Count = filteredChunks.length;
 
   const avgLatencyMs =
     filteredChunks.filter((c) => c.bestLatencyMs).length > 0
@@ -557,6 +561,55 @@ export default function SEPAppPage() {
             onImportAllSets={handleImportAllSets}
             onStartWorkoutWithSet={handleStartWorkoutWithSet}
           />
+        )}
+
+        {/* =============================================================== */}
+        {/* GLOBAL SET SWITCHER FOR ALL PHASES & STAGES */}
+        {/* =============================================================== */}
+        {(activeTab === "daily_workout" ||
+          activeTab === "stage1" ||
+          activeTab === "stage2" ||
+          activeTab === "stage3") && (
+          <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">
+                使用学習セット（全表現を全Phaseで使用可能）:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedSetFilter("ALL")}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                  selectedSetFilter === "ALL"
+                    ? "bg-white text-slate-950"
+                    : "bg-slate-800 text-slate-300 hover:text-white"
+                }`}
+              >
+                全セット ({chunks.length}表現)
+              </button>
+              {(["PEL", "ACL", "AFL", "PVPL"] as LearningSetId[]).map((id) => {
+                const count = chunks.filter((c) => c.sourceSet === id).length;
+                const active = selectedSetFilter === id;
+                const meta = LEARNING_SETS_METADATA[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedSetFilter(id)}
+                    className={`rounded-lg px-3 py-1 text-xs font-bold border transition cursor-pointer ${
+                      active
+                        ? `${meta.badgeColor} ring-1 ring-white/30`
+                        : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {id} ({count}表現)
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-xs font-mono text-emerald-300">
+              現在対象: {filteredChunks.length} 表現すべて有効
+            </span>
+          </div>
         )}
 
         {/* =============================================================== */}

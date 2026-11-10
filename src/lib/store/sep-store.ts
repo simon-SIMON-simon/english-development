@@ -488,16 +488,42 @@ export function getAllPresetChunks(): ChunkItem[] {
 export function loadChunks(): ChunkItem[] {
   if (typeof window === "undefined") return getAllPresetChunks();
   try {
+    const presets = getAllPresetChunks();
     const raw = localStorage.getItem(STORAGE_KEYS.CHUNKS);
     if (!raw) {
-      const presets = getAllPresetChunks();
       localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(presets));
       return presets;
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : getAllPresetChunks();
+    const parsed: ChunkItem[] = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(presets));
+      return presets;
+    }
+
+    // 既存の学習進捗を保持しつつ、PEL/ACL/AFL/PVPLの全表現が揃うよう自動マージ
+    if (parsed.length < presets.length) {
+      const mergedMap = new Map<string, ChunkItem>();
+      for (const item of parsed) {
+        mergedMap.set(item.chunkText.toLowerCase(), item);
+      }
+      for (const preset of presets) {
+        const key = preset.chunkText.toLowerCase();
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, preset);
+        } else {
+          // sourceSet が未設定だった既存アイテムには sourceSet を補完
+          const existing = mergedMap.get(key)!;
+          if (!existing.sourceSet && preset.sourceSet) {
+            mergedMap.set(key, { ...existing, sourceSet: preset.sourceSet });
+          }
+        }
+      }
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(merged));
+      return merged;
+    }
+
+    return parsed;
   } catch {
     return getAllPresetChunks();
   }

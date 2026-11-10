@@ -20,6 +20,7 @@ import {
   Send,
   RefreshCw,
   ArrowRight,
+  Shuffle,
 } from "lucide-react";
 
 interface Stage2TrainerProps {
@@ -35,13 +36,18 @@ export default function Stage2Trainer({
   onChunkUpdated,
   onPhaseComplete,
 }: Stage2TrainerProps) {
-  // Stage 2 (7 <= S < 21) を優先し5個束ねる
-  const stage2Chunks = chunks.filter((c) => c.stage === 2);
-  const bundledChunks = (
-    stage2Chunks.length >= 5
-      ? stage2Chunks.slice(0, 5)
-      : [...stage2Chunks, ...chunks.filter((c) => c.stage !== 2)].slice(0, 5)
-  );
+  // リスト内のすべての表現を5個単位のバッチまたはランダムで切り替え可能にする
+  const [batchStartIndex, setBatchStartIndex] = useState(0);
+  const [customBundled, setCustomBundled] = useState<ChunkItem[] | null>(null);
+
+  const totalBatches = Math.max(1, Math.ceil(chunks.length / 5));
+  const currentBatchNumber = Math.floor(batchStartIndex / 5) + 1;
+
+  const bundledChunks =
+    customBundled ||
+    chunks.slice(batchStartIndex, batchStartIndex + 5).concat(
+      chunks.slice(0, Math.max(0, 5 - (chunks.length - batchStartIndex)))
+    ).slice(0, 5);
 
   const [passageData, setPassageData] = useState<Stage2PassageData | null>(
     null
@@ -64,18 +70,23 @@ export default function Stage2Trainer({
   const [sentenceFeedback, setSentenceFeedback] =
     useState<SentenceFeedback | null>(null);
 
-  const generatePassage = async () => {
+  const generatePassage = async (overrideChunks?: ChunkItem[]) => {
+    const targetBundle = overrideChunks || bundledChunks;
     setIsGenerating(true);
     setShowFullText(false);
     setDictationChecked(false);
     setDictationInputs({});
+    if (targetBundle[0]) {
+      setSelectedChunkForSentence(targetBundle[0]);
+      setSentenceFeedback(null);
+    }
     try {
       const res = await fetch("/api/workout/stage2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "generate_passage",
-          chunks: bundledChunks,
+          chunks: targetBundle,
           specialtyDomains: profile.specialtyDomains,
           apiKey: profile.geminiApiKey,
         }),
@@ -90,9 +101,29 @@ export default function Stage2Trainer({
   };
 
   useEffect(() => {
-    generatePassage();
+    setBatchStartIndex(0);
+    setCustomBundled(null);
+    const initialFive = chunks.slice(0, 5);
+    generatePassage(initialFive);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [chunks]);
+
+  const handleNextBatch = () => {
+    setCustomBundled(null);
+    const nextIdx = (batchStartIndex + 5) % Math.max(1, chunks.length);
+    setBatchStartIndex(nextIdx);
+    const nextFive = chunks
+      .slice(nextIdx, nextIdx + 5)
+      .concat(chunks.slice(0, Math.max(0, 5 - (chunks.length - nextIdx))))
+      .slice(0, 5);
+    generatePassage(nextFive);
+  };
+
+  const handleRandomBundle = () => {
+    const shuffled = [...chunks].sort(() => Math.random() - 0.5).slice(0, 5);
+    setCustomBundled(shuffled);
+    generatePassage(shuffled);
+  };
 
   const handleEvaluateSentence = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,34 +174,54 @@ export default function Stage2Trainer({
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300 border border-emerald-500/30">
               <BookOpen className="w-3.5 h-3.5" />
-              Stage 2: 動的文脈多読 & ゼロから短文生成（S &gt; 7日チャンク5個束ね）
+              Stage 2: 動的文脈多読 & ゼロから短文生成（リスト全 {chunks.length} 表現対応・5個束ね）
             </span>
             <h2 className="mt-2 text-xl font-bold text-white">
               既知語率98%の200語記事（1.2倍速聴解＋ディクテーション）& 自己参照短文作成
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={generatePassage}
-            disabled={isGenerating}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`}
-            />
-            別文脈で200語記事を再生成
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleNextBatch}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-500 cursor-pointer"
+            >
+              次の5表現へ (バッチ {currentBatchNumber}/{totalBatches})
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleRandomBundle}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 cursor-pointer"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+              ランダム5表現
+            </button>
+            <button
+              type="button"
+              onClick={() => generatePassage()}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`}
+              />
+              記事再生成
+            </button>
+          </div>
         </div>
 
         {/* Bundled 5 Chunks Pills */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-400">束ねた5チャンク:</span>
+          <span className="text-xs text-slate-400">今回の5チャンク:</span>
           {bundledChunks.map((c) => (
             <span
               key={c.id}
               className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200"
             >
-              {c.chunkText} (S={c.stability}d)
+              {c.chunkText} ({c.meaningJa})
             </span>
           ))}
         </div>

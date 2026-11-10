@@ -20,6 +20,7 @@ import {
   ArrowRight,
   EyeOff,
   RotateCcw,
+  Shuffle,
 } from "lucide-react";
 
 interface Stage1TrainerProps {
@@ -33,13 +34,28 @@ export default function Stage1Trainer({
   onChunkUpdated,
   onPhaseComplete,
 }: Stage1TrainerProps) {
-  // Stage 1 優先、なければ全チャンクから選択
-  const queue = chunks.filter((c) => c.stage === 1).length > 0
-    ? chunks.filter((c) => c.stage === 1)
-    : chunks.slice(0, 5);
+  const [scopeMode, setScopeMode] = useState<"all" | "stage1_only">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // デフォルトで選択中のセットの「すべての表現」を使用可能にする
+  const baseQueue =
+    scopeMode === "stage1_only"
+      ? chunks.filter((c) => c.stage === 1).length > 0
+        ? chunks.filter((c) => c.stage === 1)
+        : chunks
+      : chunks;
+
+  const queue = searchQuery.trim()
+    ? baseQueue.filter(
+        (c) =>
+          c.chunkText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.meaningJa.includes(searchQuery)
+      )
+    : baseQueue;
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const currentChunk = queue[currentIndex] || queue[0];
+  const safeIndex = queue.length > 0 ? currentIndex % queue.length : 0;
+  const currentChunk = queue[safeIndex] || chunks[0];
 
   const [inputMode, setInputMode] = useState<"typing" | "voice">("typing");
   const [phaseState, setPhaseState] = useState<
@@ -291,15 +307,58 @@ export default function Stage1Trainer({
 
       {/* Main Arena Card */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-6 sm:p-8 shadow-2xl">
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-6">
-          <span>
-            カード {currentIndex + 1} / {queue.length}
-          </span>
-          <span className="font-mono">
-            現在の記憶安定度 S ={" "}
-            <strong className="text-white">{currentChunk.stability}日</strong>{" "}
-            (Stage 2昇格条件: S ≥ 7.0日)
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 mb-6 pb-4 border-b border-slate-800/80">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-200">
+              表現 {safeIndex + 1} / {queue.length}
+            </span>
+            {currentChunk.sourceSet && (
+              <span className="rounded-md bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 text-[10px] font-bold text-indigo-300">
+                {currentChunk.sourceSet}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (queue.length > 1) {
+                  const rand = Math.floor(Math.random() * queue.length);
+                  setCurrentIndex(rand);
+                  setPhaseState("ready");
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-cyan-300 hover:bg-slate-700 cursor-pointer"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+              ランダム出題
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setScopeMode(scopeMode === "all" ? "stage1_only" : "all")
+              }
+              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:text-white cursor-pointer"
+            >
+              対象: {scopeMode === "all" ? `リスト全表現 (${chunks.length})` : "Stage 1のみ"}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentIndex(0);
+              }}
+              placeholder="表現を検索して絞り込み..."
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+            />
+            <span className="font-mono">
+              安定度 S ={" "}
+              <strong className="text-white">{currentChunk.stability}日</strong>{" "}
+              (Stage {currentChunk.stage})
+            </span>
+          </div>
         </div>
 
         {/* Phase: READY */}
