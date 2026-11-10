@@ -575,29 +575,108 @@ export default function Stage1Trainer({
               )}
             </div>
 
-            {/* Revealed Chunk & Phonetics */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-slate-400">正解チャンク</div>
-                  <div className="text-2xl font-extrabold text-white mt-0.5">
-                    {currentChunk.chunkText}
+            {/* Your Input vs Target Chunk + Meaning + Detailed Explanation */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 space-y-5">
+              {/* 1. 自分が入力したチャンク vs 正解チャンク */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="text-xs font-semibold text-slate-400">
+                    あなたが入力したチャンク
+                  </div>
+                  <div
+                    className={`mt-1 text-xl font-bold font-mono break-words ${
+                      resultInfo.isCorrect ? "text-emerald-300" : "text-rose-400"
+                    }`}
+                  >
+                    {typedText.trim() ? typedText : "（未入力 / ギブアップ）"}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => speakEnglishText(currentChunk.chunkText, 1.0)}
-                  className="rounded-full bg-indigo-500/20 p-3 text-indigo-300 hover:bg-indigo-500/30 cursor-pointer"
-                >
-                  <Volume2 className="w-5 h-5" />
-                </button>
+
+                <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/20 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-indigo-300">
+                      正解チャンク
+                    </div>
+                    <div className="mt-1 text-2xl font-extrabold text-white">
+                      {currentChunk.chunkText}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speakEnglishText(currentChunk.chunkText, 1.0)}
+                    className="rounded-full bg-indigo-500/20 p-3 text-indigo-300 hover:bg-indigo-500/30 cursor-pointer shrink-0"
+                    title="正解チャンクの音声を再生"
+                  >
+                    <Volume2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-              <div className="text-xs font-mono text-cyan-300">
-                {currentChunk.elaboration.phonetics.ipa} —{" "}
-                {currentChunk.elaboration.phonetics.linkingAndWeakForms}
+
+              {/* 2. チャンクの意味 */}
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="text-xs font-semibold text-amber-300">
+                  チャンクの意味（日本語概念）
+                </div>
+                <div className="mt-1 text-lg font-extrabold text-amber-200">
+                  {currentChunk.meaningJa}
+                </div>
               </div>
-              <div className="text-sm text-slate-300 border-t border-slate-800 pt-2">
-                {currentChunk.elaboration.selfReference.exampleEn}
+
+              {/* 3. 詳細解説（語法・語源・ニュアンス・音声変化・例文） */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-1.5">
+                  <div className="text-xs font-bold text-indigo-400">
+                    解説（語法・ニュアンス・語源）
+                  </div>
+                  <div className="text-xs text-slate-400 font-mono">
+                    {currentChunk.elaboration.etymology.prefix} /{" "}
+                    {currentChunk.elaboration.etymology.root}
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed">
+                    {currentChunk.elaboration.etymology.nuance}
+                  </p>
+                  <p className="text-xs text-slate-400 pt-1">
+                    <strong className="text-slate-300">視覚イメージ:</strong>{" "}
+                    {currentChunk.elaboration.visualImage}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-2">
+                  <div className="text-xs font-bold text-cyan-400">
+                    音声知覚・リンキング解説 &amp; 実践例文
+                  </div>
+                  <div className="text-xs font-mono text-cyan-200">
+                    {currentChunk.elaboration.phonetics.ipa}
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {currentChunk.elaboration.phonetics.linkingAndWeakForms}
+                  </p>
+                  <div className="border-t border-slate-800 pt-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-emerald-400 font-semibold">
+                        実践例文 ({currentChunk.elaboration.selfReference.domain})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          speakEnglishText(
+                            currentChunk.elaboration.selfReference.exampleEn,
+                            1.0
+                          )
+                        }
+                        className="text-[11px] text-indigo-300 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Volume2 className="w-3 h-3" /> 例文再生
+                      </button>
+                    </div>
+                    <p className="text-xs font-medium text-white">
+                      &ldquo;{currentChunk.elaboration.selfReference.exampleEn}&rdquo;
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {currentChunk.elaboration.selfReference.exampleJa}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 

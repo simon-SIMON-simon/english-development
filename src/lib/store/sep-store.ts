@@ -4,11 +4,24 @@ import { ChunkItem, LearningSetId, ReviewLog, UserProfile } from "@/types/sep";
 import { PRESET_LEARNING_SETS_CHUNKS } from "@/lib/data/learning-sets";
 
 const STORAGE_KEYS = {
-  CHUNKS: "sep_chunks_v1",
+  CUSTOM_CHUNKS: "sep_custom_chunks_v2",
+  CHUNK_DELTAS: "sep_chunk_deltas_v2",
+  DELETED_IDS: "sep_deleted_ids_v2",
   LOGS: "sep_review_logs_v1",
   PROFILE: "sep_user_profile_v1",
-  ACTIVE_SET: "sep_active_set_v1",
 };
+
+interface ChunkProgressDelta {
+  stage: ChunkItem["stage"];
+  stability: number;
+  difficulty: number;
+  reps: number;
+  lapses: number;
+  lastLatencyMs?: number;
+  bestLatencyMs?: number;
+  lastReview?: string;
+  nextReview: string;
+}
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   displayName: "西門",
@@ -476,122 +489,156 @@ export const INITIAL_SEED_CHUNKS: ChunkItem[] = [
   },
 ];
 
+let cachedPresets: ChunkItem[] | null = null;
+
 export function getAllPresetChunks(): ChunkItem[] {
-  return [
-    ...PRESET_LEARNING_SETS_CHUNKS.PEL,
-    ...PRESET_LEARNING_SETS_CHUNKS.ACL,
-    ...PRESET_LEARNING_SETS_CHUNKS.AFL,
-    ...PRESET_LEARNING_SETS_CHUNKS.PVPL,
-  ];
+  if (!cachedPresets) {
+    cachedPresets = [
+      ...PRESET_LEARNING_SETS_CHUNKS.PEL,
+      ...PRESET_LEARNING_SETS_CHUNKS.ACL,
+      ...PRESET_LEARNING_SETS_CHUNKS.AFL,
+      ...PRESET_LEARNING_SETS_CHUNKS.PVPL,
+    ];
+  }
+  return cachedPresets;
 }
 
 export function loadChunks(): ChunkItem[] {
-  if (typeof window === "undefined") return getAllPresetChunks();
+  const presets = getAllPresetChunks();
+  if (typeof window === "undefined") return presets;
+
   try {
-    const presets = getAllPresetChunks();
-    const raw = localStorage.getItem(STORAGE_KEYS.CHUNKS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(presets));
-      return presets;
-    }
-    const parsed: ChunkItem[] = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(presets));
-      return presets;
-    }
+    // 以前の巨大キャッシュがあれば削除して容量を解放
+    localStorage.removeItem("sep_chunks_v1");
 
-    // 既存の学習進捗を保持しつつ、PEL/ACL/AFL/PVPLの全表現が揃うよう自動マージ
-    if (parsed.length < presets.length) {
-      const mergedMap = new Map<string, ChunkItem>();
-      for (const item of parsed) {
-        mergedMap.set(item.chunkText.toLowerCase(), item);
-      }
-      for (const preset of presets) {
-        const key = preset.chunkText.toLowerCase();
-        if (!mergedMap.has(key)) {
-          mergedMap.set(key, preset);
-        } else {
-          // sourceSet が未設定だった既存アイテムには sourceSet を補完
-          const existing = mergedMap.get(key)!;
-          if (!existing.sourceSet && preset.sourceSet) {
-            mergedMap.set(key, { ...existing, sourceSet: preset.sourceSet });
-          }
-        }
-      }
-      const merged = Array.from(mergedMap.values());
-      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(merged));
-      return merged;
-    }
+    const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+    const deltasRaw = localStorage.getItem(STORAGE_KEYS.CHUNK_DELTAS);
+    const deletedRaw = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
 
-    return parsed;
+    const customChunks: ChunkItem[] = customRaw ? JSON.parse(customRaw) : [];
+    const deltas: Record<string, ChunkProgressDelta> = deltasRaw
+      ? JSON.parse(deltasRaw)
+      : {};
+    const deletedSet = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
+
+    const mergedPresets = presets
+      .filter((p) => !deletedSet.has(p.id))
+      .map((p) => {
+        const d = deltas[p.id];
+        return d ? { ...p, ...d } : p;
+      });
+
+    return [...customChunks, ...mergedPresets];
   } catch {
-    return getAllPresetChunks();
+    return presets;
   }
 }
 
 export function saveChunks(chunks: ChunkItem[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(chunks));
+  try {
+    const presetIds = new Set(getAllPresetChunks().map((p) => p.id));
+    const customChunks = chunks.filter((c) => !presetIds.has(c.id));
+    localStorage.setItem(
+      STORAGE_KEYS.CUSTOM_CHUNKS,
+      JSON.stringify(customChunks)
+    );
+  } catch {
+    // ignore quota error
+  }
 }
 
-export function importLearningSet(setId: LearningSetId): ChunkItem[] {
-  const current = loadChunks();
-  const toImport = PRESET_LEARNING_SETS_CHUNKS[setId] || [];
-  
-  // 既存のIDと重複しないようにマージ、既存にあれば上書きまたは維持
-  const currentMap = new Map(current.map((c) => [c.chunkText.toLowerCase(), c]));
-  toImport.forEach((item) => {
-    if (!currentMap.has(item.chunkText.toLowerCase())) {
-      currentMap.set(item.chunkText.toLowerCase(), item);
-    }
-  });
-
-  const next = Array.from(currentMap.values());
-  saveChunks(next);
-  return next;
+export function importLearningSet(_setId: LearningSetId): ChunkItem[] {
+  return loadChunks();
 }
 
 export function importAllLearningSets(): ChunkItem[] {
-  const all = getAllPresetChunks();
-  const current = loadChunks();
-  const currentMap = new Map(current.map((c) => [c.chunkText.toLowerCase(), c]));
-  all.forEach((item) => {
-    if (!currentMap.has(item.chunkText.toLowerCase())) {
-      currentMap.set(item.chunkText.toLowerCase(), item);
-    }
-  });
-  const next = Array.from(currentMap.values());
-  saveChunks(next);
-  return next;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEYS.DELETED_IDS);
+  }
+  return loadChunks();
 }
 
 export function upsertChunk(chunk: ChunkItem): ChunkItem[] {
-  const current = loadChunks();
-  const idx = current.findIndex((c) => c.id === chunk.id);
-  let next: ChunkItem[];
-  if (idx >= 0) {
-    next = [...current];
-    next[idx] = chunk;
-  } else {
-    next = [chunk, ...current];
+  if (typeof window !== "undefined") {
+    try {
+      const presetIds = new Set(getAllPresetChunks().map((p) => p.id));
+      if (presetIds.has(chunk.id)) {
+        const deltasRaw = localStorage.getItem(STORAGE_KEYS.CHUNK_DELTAS);
+        const deltas: Record<string, ChunkProgressDelta> = deltasRaw
+          ? JSON.parse(deltasRaw)
+          : {};
+        deltas[chunk.id] = {
+          stage: chunk.stage,
+          stability: chunk.stability,
+          difficulty: chunk.difficulty,
+          reps: chunk.reps,
+          lapses: chunk.lapses,
+          lastLatencyMs: chunk.lastLatencyMs,
+          bestLatencyMs: chunk.bestLatencyMs,
+          lastReview: chunk.lastReview,
+          nextReview: chunk.nextReview,
+        };
+        localStorage.setItem(
+          STORAGE_KEYS.CHUNK_DELTAS,
+          JSON.stringify(deltas)
+        );
+      } else {
+        const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+        const customChunks: ChunkItem[] = customRaw ? JSON.parse(customRaw) : [];
+        const idx = customChunks.findIndex((c) => c.id === chunk.id);
+        if (idx >= 0) {
+          customChunks[idx] = chunk;
+        } else {
+          customChunks.unshift({ ...chunk, sourceSet: chunk.sourceSet || "CUSTOM" });
+        }
+        localStorage.setItem(
+          STORAGE_KEYS.CUSTOM_CHUNKS,
+          JSON.stringify(customChunks)
+        );
+      }
+    } catch {
+      // ignore
+    }
   }
-  saveChunks(next);
-  return next;
+  return loadChunks();
 }
 
 export function deleteChunkById(id: string): ChunkItem[] {
-  const current = loadChunks().filter((c) => c.id !== id);
-  saveChunks(current);
-  return current;
+  if (typeof window !== "undefined") {
+    try {
+      const deletedRaw = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
+      const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem(
+          STORAGE_KEYS.DELETED_IDS,
+          JSON.stringify(deletedIds)
+        );
+      }
+      const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+      if (customRaw) {
+        const customChunks: ChunkItem[] = JSON.parse(customRaw);
+        localStorage.setItem(
+          STORAGE_KEYS.CUSTOM_CHUNKS,
+          JSON.stringify(customChunks.filter((c) => c.id !== id))
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return loadChunks();
 }
 
 export function resetToSeedChunks(): ChunkItem[] {
-  const presets = getAllPresetChunks();
-  saveChunks(presets);
   if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+    localStorage.removeItem(STORAGE_KEYS.CHUNK_DELTAS);
+    localStorage.removeItem(STORAGE_KEYS.DELETED_IDS);
     localStorage.removeItem(STORAGE_KEYS.LOGS);
   }
-  return presets;
+  return getAllPresetChunks();
 }
 
 export function loadReviewLogs(): ReviewLog[] {

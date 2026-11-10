@@ -306,10 +306,10 @@ export default function Stage0Elaborator({
       {/* Registered Chunks Inventory */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
         <h3 className="text-lg font-bold text-white mb-4">
-          登録済みチャンク・パイプライン一覧（全 {chunks.length} チャンク）
+          登録済みチャンク・パイプライン一覧（全 {chunks.length.toLocaleString()} チャンク中 先頭60件表示）
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {chunks.map((chunk) => (
+          {chunks.slice(0, 60).map((chunk) => (
             <div
               key={chunk.id}
               className="rounded-xl border border-slate-800 bg-slate-950/80 p-4 flex flex-col justify-between gap-3 hover:border-slate-700 transition"

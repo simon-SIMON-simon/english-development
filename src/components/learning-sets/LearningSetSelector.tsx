@@ -36,6 +36,7 @@ export default function LearningSetSelector({
 }: LearningSetSelectorProps) {
   const [activeTab, setActiveTab] = useState<LearningSetId>("PEL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleLimit, setVisibleLimit] = useState(120);
   const metaList: LearningSetId[] = ["PEL", "ACL", "AFL", "PVPL"];
 
   const activeMeta = LEARNING_SETS_METADATA[activeTab];
@@ -54,6 +55,8 @@ export default function LearningSetSelector({
       )
     : activeChunks;
 
+  const displayedChunks = filteredActiveChunks.slice(0, visibleLimit);
+
   const installedCount = currentChunks.filter(
     (c) => c.sourceSet === activeTab
   ).length;
@@ -68,13 +71,13 @@ export default function LearningSetSelector({
           <div className="space-y-2 max-w-2xl">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3.5 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/30">
               <GraduationCap className="w-4 h-4" />
-              SLA (第二言語習得論) 公認・4大重要コーパス学習セット（全 {totalCatalogCount} 表現収録）
+              原典総計 3,724表現 → 重複排除済 {totalCatalogCount.toLocaleString()} ユニーク表現収録
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              PEL・ACL・AFL・PVPL 全表現 × 全Phase（Phase 1〜3）完全対応
+              PEL (505)・ACL (2,265)・AFL (600)・PVPL (150) 全表現 × 全Phase完全対応
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              各リストに収録されているすべての表現を、Phase 1（3000ms瞬間検索）・Phase 2（既知語率98%の200語多読＆短文生成）・Phase 3（AI音声反駁＆90/60/45秒スプリント）のどのPhaseでも制限なく使用できます。
+              4大コーパス（原典計3,724表現）からリスト間の重複を排除した全{totalCatalogCount.toLocaleString()}表現を完全収録。すべての表現をPhase 1（3000ms瞬間検索）・Phase 2（200語多読＆短文生成）・Phase 3（AI音声反駁＆90/60/45秒スプリント）で制限なく使用できます。
             </p>
           </div>
 
@@ -232,7 +235,7 @@ export default function LearningSetSelector({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[640px] overflow-y-auto pr-1">
-            {filteredActiveChunks.map((chunk, idx) => (
+            {displayedChunks.map((chunk, idx) => (
               <div
                 key={chunk.id}
                 className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-1.5 hover:border-slate-700 transition"
@@ -257,9 +260,31 @@ export default function LearningSetSelector({
                 <div className="text-xs text-amber-300/90 font-medium">
                   {chunk.meaningJa}
                 </div>
+                <div className="text-[11px] text-slate-400 line-clamp-2 pt-1 border-t border-slate-900">
+                  {chunk.elaboration.etymology.nuance}
+                </div>
               </div>
             ))}
           </div>
+
+          {filteredActiveChunks.length > visibleLimit && (
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setVisibleLimit((prev) => prev + 200)}
+                className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700 cursor-pointer"
+              >
+                さらに200件を表示（残り {filteredActiveChunks.length - visibleLimit} 件）
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibleLimit(filteredActiveChunks.length)}
+                className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-5 py-2.5 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 cursor-pointer"
+              >
+                全 {filteredActiveChunks.length} 件をすべて展開
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
