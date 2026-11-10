@@ -73,6 +73,184 @@ const DOMAINS = [
   "認知科学・第二言語習得",
 ];
 
+const PREDICATIVE_CHUNKS = new Set([
+  "out of the question",
+  "out of date",
+  "out of order",
+  "out of control",
+  "out of reach",
+  "out of sight",
+  "under control",
+  "under consideration",
+  "under construction",
+  "under pressure",
+  "up to date",
+  "at stake",
+  "in progress",
+  "in vain",
+]);
+
+/**
+ * チャンクの統語パターンに応じて自然な実践ミニ例文（英語＋日本語訳）を生成
+ * Step 2（実践ミニ例文の穴埋め）でそのまま穴埋め問題として機能する
+ */
+export function buildPracticalMiniExample(
+  chunkText: string,
+  meaningJa: string
+): { exampleEn: string; exampleJa: string } {
+  const lower = chunkText.toLowerCase().trim();
+  const cleanMeaning = meaningJa.replace(/[〜：:]/g, "").trim();
+
+  // 1. that節を導く構文
+  if (lower.endsWith(" that")) {
+    if (lower.startsWith("it ") || lower.startsWith("there ")) {
+      return {
+        exampleEn: `${chunkText} this architecture significantly reduces latency.`,
+        exampleJa: `この設計によってレイテンシが大幅に削減される（${cleanMeaning}）。`,
+      };
+    }
+    return {
+      exampleEn: `We approved the release ${chunkText} all automated tests pass.`,
+      exampleJa: `すべての自動テストを通過する（${cleanMeaning}）、リリースを承認した。`,
+    };
+  }
+
+  // 2. 主語＋動詞で始まるスタンス表現 (it is ... to / we need to / engineers strive to 等)
+  if (
+    /^(it is |we |one can |researchers |engineers |leaders |systems |as far as )/.test(
+      lower
+    )
+  ) {
+    if (lower === "as far as i am concerned") {
+      return {
+        exampleEn: `${chunkText}, code readability always comes first.`,
+        exampleJa: `${cleanMeaning}、コードの可読性が常に最優先だ。`,
+      };
+    }
+    if (/\b(between)$/.test(lower)) {
+      return {
+        exampleEn: `${chunkText} the two competing designs.`,
+        exampleJa: `競合する2つの設計について（${cleanMeaning}）。`,
+      };
+    }
+    if (/\b(of|in|on|for|to|from|with)$/.test(lower)) {
+      return {
+        exampleEn: `${chunkText} the core system before launch.`,
+        exampleJa: `ローンチ前にコアシステムについて（${cleanMeaning}）。`,
+      };
+    }
+    return {
+      exampleEn: `${chunkText} before scaling the platform.`,
+      exampleJa: `プラットフォームを拡張する前に、（${cleanMeaning}）。`,
+    };
+  }
+
+  // 3. be動詞の補語になる表現
+  if (PREDICATIVE_CHUNKS.has(lower)) {
+    return {
+      exampleEn: `The legacy module is currently ${chunkText}.`,
+      exampleJa: `そのレガシーモジュールは現在（${cleanMeaning}）の状態だ。`,
+    };
+  }
+  if (lower === "at odds with") {
+    return {
+      exampleEn: `This proposal is ${chunkText} our security policy.`,
+      exampleJa: `この提案は私たちのセキュリティ方針と（${cleanMeaning}）いる。`,
+    };
+  }
+  if (lower === "at a loss") {
+    return {
+      exampleEn: `The team was ${chunkText} when the main server went down.`,
+      exampleJa: `メインサーバーが停止した際、チームは（${cleanMeaning}）いた。`,
+    };
+  }
+  if (lower === "by far the most") {
+    return {
+      exampleEn: `This is ${chunkText} reliable method we have tested.`,
+      exampleJa: `これは私たちが検証した中で（${cleanMeaning}）信頼できる手法だ。`,
+    };
+  }
+  if (lower === "by no means") {
+    return {
+      exampleEn: `The current pipeline is ${chunkText} complete yet.`,
+      exampleJa: `現在のパイプラインはまだ（${cleanMeaning}）完成していない。`,
+    };
+  }
+  if (lower === "in order to") {
+    return {
+      exampleEn: `We simplified the interface ${chunkText} reduce user friction.`,
+      exampleJa: `ユーザーの摩擦を減らす（${cleanMeaning}）、インターフェースを簡素化した。`,
+    };
+  }
+  if (lower === "as well as") {
+    return {
+      exampleEn: `The new engine improves speed ${chunkText} memory efficiency.`,
+      exampleJa: `新エンジンはメモリ効率（${cleanMeaning}）処理速度も向上させる。`,
+    };
+  }
+
+  // 4. 前置詞・副詞で始まる定型句
+  if (
+    /^(in |on |at |by |for |with |from |out of |under |up to |prior to|subsequent to|across |around |behind |off |without |to |as |once |first )/.test(
+      lower
+    )
+  ) {
+    if (lower.endsWith(" the")) {
+      return {
+        exampleEn: `We adjusted our plan ${chunkText} latest benchmark results.`,
+        exampleJa: `最新のベンチマーク結果（${cleanMeaning}）、計画を調整した。`,
+      };
+    }
+    if (/\b(of|to|with|for|from)$/.test(lower)) {
+      return {
+        exampleEn: `We redesigned the workflow ${chunkText} recent empirical data.`,
+        exampleJa: `最近の実証データ（${cleanMeaning}）、ワークフローを再設計した。`,
+      };
+    }
+    return {
+      exampleEn: `We decided to refactor the core module ${chunkText}.`,
+      exampleJa: `（${cleanMeaning}）、私たちはコアモジュールを改修することに決めた。`,
+    };
+  }
+
+  // 5. 動詞チャンク (ACL / PVPL 等)
+  if (lower.startsWith("be ")) {
+    return {
+      exampleEn: `This caching layer will ${chunkText} reducing response time.`,
+      exampleJa: `このキャッシュ層は応答時間の短縮において（${cleanMeaning}）だろう。`,
+    };
+  }
+  if (lower.endsWith(" between")) {
+    return {
+      exampleEn: `We must ${chunkText} speed and long-term maintainability.`,
+      exampleJa: `スピードと長期的な保守性の（${cleanMeaning}）必要がある。`,
+    };
+  }
+  if (lower === "give rise to unintended") {
+    return {
+      exampleEn: `A rushed update may ${chunkText} side effects in production.`,
+      exampleJa: `急場しのぎの更新は本番環境で（${cleanMeaning}）副作用を生む恐れがある。`,
+    };
+  }
+  if (lower === "take into full account" || lower === "take for granted") {
+    return {
+      exampleEn: `Engineers must ${chunkText} potential network failures.`,
+      exampleJa: `エンジニアは潜在的なネットワーク障害を（${cleanMeaning}）必要がある。`,
+    };
+  }
+  if (/\b(in|on|to|of|for|into|over|with|from)$/.test(lower)) {
+    return {
+      exampleEn: `Our team aims to ${chunkText} the new system architecture.`,
+      exampleJa: `私たちのチームは新システム設計において（${cleanMeaning}）ことを目指している。`,
+    };
+  }
+
+  return {
+    exampleEn: `Our team decided to ${chunkText} before the next release.`,
+    exampleJa: `次のリリース前に、チームは（${cleanMeaning}）ことに決めた。`,
+  };
+}
+
 function buildChunksFromCatalog(
   setId: LearningSetId,
   catalog: RawCorpusTuple[]
@@ -91,6 +269,8 @@ function buildChunksFromCatalog(
     const detailedExplanation =
       customNuance ||
       `単体語「${coreWord}」としてではなく、共起チャンク『${chunkText}』（${meaningJa}）を1つの手続き記憶ブロックとして脳内に格納することで、リスニング知覚とスピーキング発話の双方で3000ms以内の即時処理を実現します。`;
+
+    const miniExample = buildPracticalMiniExample(chunkText, meaningJa);
 
     return {
       id: `${setId.toLowerCase()}-${idx + 1}`,
@@ -116,10 +296,8 @@ function buildChunksFromCatalog(
         visualImage: `「${chunkText}」というチャンクの塊が概念「${meaningJa}」と直結し、3000ms以内に瞬時に引き出されるメンタルモデル`,
         selfReference: {
           domain,
-          exampleEn: `In our ${
-            idx % 2 === 0 ? "AI architecture review" : "product strategy meeting"
-          }, we utilized "${chunkText}" to articulate our core point clearly.`,
-          exampleJa: `西門の${domain}の文脈において、「${meaningJa}（${chunkText}）」を即座に運用して議論の核心を明確に伝えた。`,
+          exampleEn: miniExample.exampleEn,
+          exampleJa: miniExample.exampleJa,
         },
         phonetics: {
           ipa: `/${chunkText.toLowerCase()}/`,

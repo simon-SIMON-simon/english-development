@@ -52,7 +52,6 @@ export default function Stage0Elaborator({
           rawInput: rawInput.trim(),
           userName: profile.displayName,
           specialtyDomains: profile.specialtyDomains,
-          apiKey: profile.geminiApiKey,
         }),
       });
       const data = await res.json();

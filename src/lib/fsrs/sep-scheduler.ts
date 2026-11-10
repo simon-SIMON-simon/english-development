@@ -43,60 +43,46 @@ export function evaluateLatencyRating(
     return {
       rating: 1, // Again
       latencyPassed: false,
-      feedbackLabel: "Incorrect — 再符号化・再検索が必要です",
+      feedbackLabel:
+        "❌ 不正解 (Incorrect) — チャンクが一致しないため昇格なし（安定度S据え置き）",
     };
   }
 
-  // Stage 1: 厳格な3000ms反応潜時ゲート
-  if (stage === 1) {
-    if (latencyMs <= STAGE1_FAST_LATENCY_MS) {
-      return {
-        rating: 4, // Easy (即座の手続き記憶検索)
-        latencyPassed: true,
-        feedbackLabel: `⚡ Instant Retrieval (${latencyMs}ms ≤ 1800ms) — 大幅ブースト!`,
-      };
-    }
-    if (latencyMs <= STAGE1_MAX_LATENCY_MS) {
-      return {
-        rating: 3, // Good (3秒以内クリア)
-        latencyPassed: true,
-        feedbackLabel: `✅ Cleared within 3s (${latencyMs}ms ≤ 3000ms) — 安定度S更新!`,
-      };
-    }
-    // 正解だが3000ms超過: 宣言的知識に留まっており自動化されていない
+  // 厳格な3000ms反応潜時ゲート
+  if (latencyMs <= STAGE1_FAST_LATENCY_MS) {
     return {
-      rating: 2, // Hard (昇格ブロック)
-      latencyPassed: false,
-      feedbackLabel: `⚠️ Too Slow (${latencyMs}ms > 3000ms) — 正解ですが3秒を超過したため安定度Sは据え置きです`,
-    };
-  }
-
-  // Stage 2 & 3
-  if (latencyMs <= 2500) {
-    return {
-      rating: 4,
+      rating: 4, // Easy (即座の手続き記憶検索)
       latencyPassed: true,
-      feedbackLabel: `⚡ Automatic (${latencyMs}ms)`,
+      feedbackLabel: `⭕ 正解 & ⚡ Instant Retrieval (${latencyMs}ms ≤ 1800ms) — 大幅ブースト!`,
     };
   }
+  if (latencyMs <= STAGE1_MAX_LATENCY_MS) {
+    return {
+      rating: 3, // Good (3秒以内クリア)
+      latencyPassed: true,
+      feedbackLabel: `⭕ 正解 & ✅ 3秒以内クリア (${latencyMs}ms ≤ 3000ms) — 安定度S更新!`,
+    };
+  }
+  // 正解だが3000ms超過: 宣言的知識に留まっており自動化されていない
   return {
-    rating: 3,
-    latencyPassed: true,
-    feedbackLabel: `✅ Solid (${latencyMs}ms)`,
+    rating: 2, // Hard (昇格ブロック)
+    latencyPassed: false,
+    feedbackLabel: `⭕ 正解 / ⚠️ 3000ms超過 (${latencyMs}ms > 3000ms) — 3秒を超過したため昇格なし（安定度S据え置き）`,
   };
 }
 
 /**
  * 記憶安定度 S に基づくステージ判定
+ * 不正解の場合、または 3000ms ゲートを通過していない場合は絶対に昇格させない
  */
 export function determineStageFromStability(
   stability: number,
   currentStage: StageNumber,
-  latencyPassed: boolean
+  latencyPassed: boolean,
+  isCorrect: boolean = true
 ): StageNumber {
-  // Stage 1 で 3000ms ゲートを通過していない場合は絶対に Stage 2 へ昇格させない
-  if (currentStage === 1 && !latencyPassed) {
-    return 1;
+  if (!isCorrect || !latencyPassed) {
+    return currentStage;
   }
 
   if (stability >= STAGE3_PROMOTION_STABILITY_DAYS) {
@@ -153,18 +139,9 @@ export function scheduleChunkReview(
 
   let nextS = sBefore;
 
-  if (!isCorrect) {
-    // Again (忘却): 安定度 S が減衰
-    nextS = Math.max(
-      0.8,
-      W[11] *
-        Math.pow(nextD, -W[12]) *
-        (Math.pow(sBefore + 1, W[13]) - 1) *
-        Math.exp(W[14] * (1 - retrievability))
-    );
-  } else if (chunk.stage === 1 && !latencyPassed) {
-    // Stage 1 で正解だが 3000ms を超えた場合:
-    // 要件「正解かつ3000ms以下の場合のみ、記憶安定度 S が更新され次ステージへの昇格判定が行われる」
+  if (!isCorrect || !latencyPassed) {
+    // 要件: 「正解かつ3000ms以下の場合のみ、記憶安定度 S が更新され次ステージへの昇格判定が行われる」
+    // 不正解の場合、または3000ms超過の場合は安定度 S を据え置きとし、昇格は一切行わない
     nextS = sBefore;
   } else {
     // 正解かつ潜時条件クリア: FSRS 安定度成長式
@@ -185,12 +162,15 @@ export function scheduleChunkReview(
   }
 
   nextS = Number(nextS.toFixed(2));
-  const nextStage = determineStageFromStability(nextS, stageBefore, latencyPassed);
+  const nextStage = determineStageFromStability(
+    nextS,
+    stageBefore,
+    latencyPassed,
+    isCorrect
+  );
 
   // 次回レビュー予定日
-  const intervalDays = !isCorrect
-    ? 0.5
-    : chunk.stage === 1 && !latencyPassed
+  const intervalDays = !isCorrect || !latencyPassed
     ? 0.5
     : Math.max(1, Math.round(nextS));
 

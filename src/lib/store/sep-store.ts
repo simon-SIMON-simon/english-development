@@ -664,9 +664,11 @@ export function loadUserProfile(): UserProfile {
   if (typeof window === "undefined") return DEFAULT_USER_PROFILE;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    return raw
-      ? { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) }
-      : DEFAULT_USER_PROFILE;
+    if (!raw) return DEFAULT_USER_PROFILE;
+    const parsed = JSON.parse(raw);
+    // セキュリティ保護: ブラウザの localStorage には API キーを保持しない
+    delete parsed.geminiApiKey;
+    return { ...DEFAULT_USER_PROFILE, ...parsed };
   } catch {
     return DEFAULT_USER_PROFILE;
   }
@@ -674,5 +676,7 @@ export function loadUserProfile(): UserProfile {
 
 export function saveUserProfile(profile: UserProfile): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  const safeProfile = { ...profile };
+  delete safeProfile.geminiApiKey;
+  localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(safeProfile));
 }

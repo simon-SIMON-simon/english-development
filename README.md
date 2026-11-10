@@ -109,13 +109,12 @@
 npm install
 ```
 
-### 2. 環境変数の設定（任意）
-`.env.example` をコピーして `.env.local` を作成するか、アプリ画面右上の**設定（歯車アイコン）**から `GEMINI_API_KEY` を設定できます（未設定でも内蔵の推論フォールバックエンジンにより全機能を即座に試用可能です）。
+### 2. 環境変数の設定（サーバーサイド専用・セキュア構成）
+プロジェクト直下の `.env.local`（`.gitignore` によりGit管理対象外）に `GEMINI_API_KEY` を設定します。
+セキュリティ保護のため、APIキーはブラウザ（`localStorage` やネットワーク通信ペイロード）には一切保存・送信されず、Next.js のサーバーサイド API Route 内でのみ参照されます。
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
 ### 3. 開発サーバーの起動

@@ -11,17 +11,16 @@ export async function POST(req: NextRequest) {
       specialtyDomains = ["ソフトウェアアーキテクチャ・AI開発", "認知科学"],
       chunkText,
       userSentence,
-      apiKey,
     } = body as {
       action: "generate_passage" | "evaluate_sentence";
       chunks?: ChunkItem[];
       specialtyDomains?: string[];
       chunkText?: string;
       userSentence?: string;
-      apiKey?: string;
     };
 
-    const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
+    // セキュリティ設計: APIキーはサーバーサイドの環境変数 (.env.local) からのみ参照
+    const effectiveKey = process.env.GEMINI_API_KEY?.trim();
 
     // =========================================================================
     // Action 1: 5チャンク束ね + 既知語率98%の200語短編記事 & マイクロディクテーション生成

@@ -94,7 +94,6 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
         action: "generate_counter",
         requiredChunks: targets,
         specialtyDomains: profile.specialtyDomains,
-        apiKey: profile.geminiApiKey,
       }),
     });
     if (res.ok) {
@@ -250,7 +249,6 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
           requiredChunks,
           aiCounterArgument: counterData?.aiCounterArgument,
           rounds: roundsToEval,
-          apiKey: profile.geminiApiKey,
         }),
       });
       if (res.ok) {
@@ -263,45 +261,36 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Stage 3 Banner */}
-      <div className="rounded-2xl border border-amber-500/30 bg-slate-900/80 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-300 border border-amber-500/30">
-              <Flame className="w-3.5 h-3.5" />
-              Stage 3: AI音声反駁（カウンター）& 90s → 60s → 45s 圧縮スプリント（全 {chunks.length} 表現対応）
+    <div className="space-y-6">
+      {/* Compact Stage 3 Toolbar */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {requiredChunks.map((c) => (
+            <span
+              key={c}
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200"
+            >
+              {c}
             </span>
-            <h2 className="mt-2 text-xl font-bold text-white">
-              指定チャンクを強制使用し、制限時間を圧縮しながら流暢性と語彙高度化を極める
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleNextThreeChunks}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 cursor-pointer"
-            >
-              次の3表現へ ({currentBatchNum}/{totalBatches})
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleRandomThreeChunks}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/20 cursor-pointer"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-              ランダム3表現
-            </button>
-            <button
-              type="button"
-              onClick={() => fetchCounterArgument()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              反駁テーマ再生成
-            </button>
-          </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleRandomThreeChunks}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 hover:text-white cursor-pointer"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            ランダム3個
+          </button>
+          <button
+            type="button"
+            onClick={handleNextThreeChunks}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 cursor-pointer"
+          >
+            次の3個 ({currentBatchNum}/{totalBatches})
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

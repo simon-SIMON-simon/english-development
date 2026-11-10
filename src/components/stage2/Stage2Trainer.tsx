@@ -88,7 +88,6 @@ export default function Stage2Trainer({
           action: "generate_passage",
           chunks: targetBundle,
           specialtyDomains: profile.specialtyDomains,
-          apiKey: profile.geminiApiKey,
         }),
       });
       const data = await res.json();
@@ -138,7 +137,6 @@ export default function Stage2Trainer({
           action: "evaluate_sentence",
           chunkText: selectedChunkForSentence.chunkText,
           userSentence: userSentence.trim(),
-          apiKey: profile.geminiApiKey,
         }),
       });
       const data = await res.json();
@@ -167,63 +165,38 @@ export default function Stage2Trainer({
   };
 
   return (
-    <div className="space-y-8">
-      {/* Stage 2 Banner */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/80 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300 border border-emerald-500/30">
-              <BookOpen className="w-3.5 h-3.5" />
-              Stage 2: 動的文脈多読 & ゼロから短文生成（リスト全 {chunks.length} 表現対応・5個束ね）
-            </span>
-            <h2 className="mt-2 text-xl font-bold text-white">
-              既知語率98%の200語記事（1.2倍速聴解＋ディクテーション）& 自己参照短文作成
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleNextBatch}
-              disabled={isGenerating}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-500 cursor-pointer"
-            >
-              次の5表現へ (バッチ {currentBatchNumber}/{totalBatches})
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleRandomBundle}
-              disabled={isGenerating}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20 cursor-pointer"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-              ランダム5表現
-            </button>
-            <button
-              type="button"
-              onClick={() => generatePassage()}
-              disabled={isGenerating}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`}
-              />
-              記事再生成
-            </button>
-          </div>
-        </div>
-
-        {/* Bundled 5 Chunks Pills */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-400">今回の5チャンク:</span>
+    <div className="space-y-6">
+      {/* Compact Stage 2 Toolbar */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {bundledChunks.map((c) => (
             <span
               key={c.id}
-              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200"
+              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-200"
             >
-              {c.chunkText} ({c.meaningJa})
+              {c.chunkText}
             </span>
           ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleRandomBundle}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 hover:text-white cursor-pointer"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            ランダム5個
+          </button>
+          <button
+            type="button"
+            onClick={handleNextBatch}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 cursor-pointer"
+          >
+            次の5個 ({currentBatchNumber}/{totalBatches})
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
