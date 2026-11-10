@@ -47,17 +47,16 @@ export async function POST(req: NextRequest) {
       specialtyDomains = ["ソフトウェアアーキテクチャ・AI開発", "認知科学"],
       aiCounterArgument,
       rounds = [],
-      apiKey,
     } = body as {
       action: "generate_counter" | "evaluate_sprint";
       requiredChunks?: string[];
       specialtyDomains?: string[];
       aiCounterArgument?: string;
       rounds?: SprintRoundResult[];
-      apiKey?: string;
     };
 
-    const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
+    // セキュリティ設計: APIキーはサーバーサイドの環境変数 (.env.local) からのみ参照
+    const effectiveKey = process.env.GEMINI_API_KEY?.trim();
 
     // =========================================================================
     // Action 1: AI音声反駁（カウンター）の生成

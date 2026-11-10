@@ -22,6 +22,8 @@ import {
   PauseCircle,
   Award,
   RefreshCw,
+  Shuffle,
+  ArrowRight,
 } from "lucide-react";
 
 interface Stage3TrainerProps {
@@ -32,13 +34,20 @@ interface Stage3TrainerProps {
 const SPRINT_TIME_LIMITS: (90 | 60 | 45)[] = [90, 60, 45];
 
 export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
-  // Stage 3 (S >= 21d) の定着チャンクを優先抽出
-  const stage3Chunks = chunks.filter((c) => c.stage === 3);
-  const requiredChunks = (
-    stage3Chunks.length >= 3
-      ? stage3Chunks.slice(0, 3)
-      : [...stage3Chunks, ...chunks].slice(0, 3)
-  ).map((c) => c.chunkText);
+  // リスト内のすべての表現を3個単位またはランダムに強制使用チャンクとして選択可能にする
+  const [batchStartIdx, setBatchStartIdx] = useState(0);
+  const [customThree, setCustomThree] = useState<string[] | null>(null);
+
+  const totalBatches = Math.max(1, Math.ceil(chunks.length / 3));
+  const currentBatchNum = Math.floor(batchStartIdx / 3) + 1;
+
+  const requiredChunks =
+    customThree ||
+    chunks
+      .slice(batchStartIdx, batchStartIdx + 3)
+      .concat(chunks.slice(0, Math.max(0, 3 - (chunks.length - batchStartIdx))))
+      .slice(0, 3)
+      .map((c) => c.chunkText);
 
   const [counterData, setCounterData] = useState<{
     topic: string;
@@ -70,7 +79,8 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const roundStartRef = useRef<number>(0);
 
-  const fetchCounterArgument = async () => {
+  const fetchCounterArgument = async (overrideRequired?: string[]) => {
+    const targets = overrideRequired || requiredChunks;
     setCompletedRounds([]);
     setEvaluation(null);
     setCurrentRoundIdx(0);
@@ -82,9 +92,8 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "generate_counter",
-        requiredChunks,
+        requiredChunks: targets,
         specialtyDomains: profile.specialtyDomains,
-        apiKey: profile.geminiApiKey,
       }),
     });
     if (res.ok) {
@@ -94,13 +103,37 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
   };
 
   useEffect(() => {
-    fetchCounterArgument();
+    setBatchStartIdx(0);
+    setCustomThree(null);
+    const firstThree = chunks.slice(0, 3).map((c) => c.chunkText);
+    fetchCounterArgument(firstThree);
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       monitorRef.current?.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [chunks]);
+
+  const handleNextThreeChunks = () => {
+    setCustomThree(null);
+    const nextIdx = (batchStartIdx + 3) % Math.max(1, chunks.length);
+    setBatchStartIdx(nextIdx);
+    const nextThree = chunks
+      .slice(nextIdx, nextIdx + 3)
+      .concat(chunks.slice(0, Math.max(0, 3 - (chunks.length - nextIdx))))
+      .slice(0, 3)
+      .map((c) => c.chunkText);
+    fetchCounterArgument(nextThree);
+  };
+
+  const handleRandomThreeChunks = () => {
+    const picked = [...chunks]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .map((c) => c.chunkText);
+    setCustomThree(picked);
+    fetchCounterArgument(picked);
+  };
 
   // チャンク使用有無判定ヘルパー
   const checkChunkUsed = (text: string, chunkText: string): boolean => {
@@ -216,7 +249,6 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
           requiredChunks,
           aiCounterArgument: counterData?.aiCounterArgument,
           rounds: roundsToEval,
-          apiKey: profile.geminiApiKey,
         }),
       });
       if (res.ok) {
@@ -229,26 +261,35 @@ export default function Stage3Trainer({ chunks, profile }: Stage3TrainerProps) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Stage 3 Banner */}
-      <div className="rounded-2xl border border-amber-500/30 bg-slate-900/80 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-300 border border-amber-500/30">
-              <Flame className="w-3.5 h-3.5" />
-              Stage 3: AI音声反駁（カウンター）& 90s → 60s → 45s 圧縮スプリント
+    <div className="space-y-6">
+      {/* Compact Stage 3 Toolbar */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {requiredChunks.map((c) => (
+            <span
+              key={c}
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200"
+            >
+              {c}
             </span>
-            <h2 className="mt-2 text-xl font-bold text-white">
-              指定チャンクを強制使用し、制限時間を圧縮しながら流暢性と語彙高度化を極める
-            </h2>
-          </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={fetchCounterArgument}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 cursor-pointer"
+            onClick={handleRandomThreeChunks}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 hover:text-white cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            新しい反駁テーマを生成
+            <Shuffle className="w-3.5 h-3.5" />
+            ランダム3個
+          </button>
+          <button
+            type="button"
+            onClick={handleNextThreeChunks}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 cursor-pointer"
+          >
+            次の3個 ({currentBatchNum}/{totalBatches})
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

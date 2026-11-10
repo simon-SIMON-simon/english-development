@@ -8,12 +8,10 @@ export async function POST(req: NextRequest) {
       rawInput,
       userName = "西門",
       specialtyDomains = ["ソフトウェアアーキテクチャ・AI開発", "プロダクト戦略"],
-      apiKey,
     } = body as {
       rawInput: string;
       userName?: string;
       specialtyDomains?: string[];
-      apiKey?: string;
     };
 
     const trimmed = (rawInput || "").trim();
@@ -24,7 +22,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
+    // セキュリティ設計: APIキーはサーバーサイドの環境変数 (.env.local) からのみ参照し、クライアントからは一切受け取らない
+    const effectiveKey = process.env.GEMINI_API_KEY?.trim();
 
     if (effectiveKey) {
       try {

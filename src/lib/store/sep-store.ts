@@ -1,12 +1,27 @@
 "use client";
 
-import { ChunkItem, ReviewLog, UserProfile } from "@/types/sep";
+import { ChunkItem, LearningSetId, ReviewLog, UserProfile } from "@/types/sep";
+import { PRESET_LEARNING_SETS_CHUNKS } from "@/lib/data/learning-sets";
 
 const STORAGE_KEYS = {
-  CHUNKS: "sep_chunks_v1",
+  CUSTOM_CHUNKS: "sep_custom_chunks_v2",
+  CHUNK_DELTAS: "sep_chunk_deltas_v2",
+  DELETED_IDS: "sep_deleted_ids_v2",
   LOGS: "sep_review_logs_v1",
   PROFILE: "sep_user_profile_v1",
 };
+
+interface ChunkProgressDelta {
+  stage: ChunkItem["stage"];
+  stability: number;
+  difficulty: number;
+  reps: number;
+  lapses: number;
+  lastLatencyMs?: number;
+  bestLatencyMs?: number;
+  lastReview?: string;
+  nextReview: string;
+}
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   displayName: "西門",
@@ -474,57 +489,156 @@ export const INITIAL_SEED_CHUNKS: ChunkItem[] = [
   },
 ];
 
+let cachedPresets: ChunkItem[] | null = null;
+
+export function getAllPresetChunks(): ChunkItem[] {
+  if (!cachedPresets) {
+    cachedPresets = [
+      ...PRESET_LEARNING_SETS_CHUNKS.PEL,
+      ...PRESET_LEARNING_SETS_CHUNKS.ACL,
+      ...PRESET_LEARNING_SETS_CHUNKS.AFL,
+      ...PRESET_LEARNING_SETS_CHUNKS.PVPL,
+    ];
+  }
+  return cachedPresets;
+}
+
 export function loadChunks(): ChunkItem[] {
-  if (typeof window === "undefined") return INITIAL_SEED_CHUNKS;
+  const presets = getAllPresetChunks();
+  if (typeof window === "undefined") return presets;
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CHUNKS);
-    if (!raw) {
-      localStorage.setItem(
-        STORAGE_KEYS.CHUNKS,
-        JSON.stringify(INITIAL_SEED_CHUNKS)
-      );
-      return INITIAL_SEED_CHUNKS;
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : INITIAL_SEED_CHUNKS;
+    // 以前の巨大キャッシュがあれば削除して容量を解放
+    localStorage.removeItem("sep_chunks_v1");
+
+    const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+    const deltasRaw = localStorage.getItem(STORAGE_KEYS.CHUNK_DELTAS);
+    const deletedRaw = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
+
+    const customChunks: ChunkItem[] = customRaw ? JSON.parse(customRaw) : [];
+    const deltas: Record<string, ChunkProgressDelta> = deltasRaw
+      ? JSON.parse(deltasRaw)
+      : {};
+    const deletedSet = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
+
+    const mergedPresets = presets
+      .filter((p) => !deletedSet.has(p.id))
+      .map((p) => {
+        const d = deltas[p.id];
+        return d ? { ...p, ...d } : p;
+      });
+
+    return [...customChunks, ...mergedPresets];
   } catch {
-    return INITIAL_SEED_CHUNKS;
+    return presets;
   }
 }
 
 export function saveChunks(chunks: ChunkItem[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(chunks));
+  try {
+    const presetIds = new Set(getAllPresetChunks().map((p) => p.id));
+    const customChunks = chunks.filter((c) => !presetIds.has(c.id));
+    localStorage.setItem(
+      STORAGE_KEYS.CUSTOM_CHUNKS,
+      JSON.stringify(customChunks)
+    );
+  } catch {
+    // ignore quota error
+  }
+}
+
+export function importLearningSet(_setId: LearningSetId): ChunkItem[] {
+  return loadChunks();
+}
+
+export function importAllLearningSets(): ChunkItem[] {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEYS.DELETED_IDS);
+  }
+  return loadChunks();
 }
 
 export function upsertChunk(chunk: ChunkItem): ChunkItem[] {
-  const current = loadChunks();
-  const idx = current.findIndex((c) => c.id === chunk.id);
-  let next: ChunkItem[];
-  if (idx >= 0) {
-    next = [...current];
-    next[idx] = chunk;
-  } else {
-    next = [chunk, ...current];
+  if (typeof window !== "undefined") {
+    try {
+      const presetIds = new Set(getAllPresetChunks().map((p) => p.id));
+      if (presetIds.has(chunk.id)) {
+        const deltasRaw = localStorage.getItem(STORAGE_KEYS.CHUNK_DELTAS);
+        const deltas: Record<string, ChunkProgressDelta> = deltasRaw
+          ? JSON.parse(deltasRaw)
+          : {};
+        deltas[chunk.id] = {
+          stage: chunk.stage,
+          stability: chunk.stability,
+          difficulty: chunk.difficulty,
+          reps: chunk.reps,
+          lapses: chunk.lapses,
+          lastLatencyMs: chunk.lastLatencyMs,
+          bestLatencyMs: chunk.bestLatencyMs,
+          lastReview: chunk.lastReview,
+          nextReview: chunk.nextReview,
+        };
+        localStorage.setItem(
+          STORAGE_KEYS.CHUNK_DELTAS,
+          JSON.stringify(deltas)
+        );
+      } else {
+        const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+        const customChunks: ChunkItem[] = customRaw ? JSON.parse(customRaw) : [];
+        const idx = customChunks.findIndex((c) => c.id === chunk.id);
+        if (idx >= 0) {
+          customChunks[idx] = chunk;
+        } else {
+          customChunks.unshift({ ...chunk, sourceSet: chunk.sourceSet || "CUSTOM" });
+        }
+        localStorage.setItem(
+          STORAGE_KEYS.CUSTOM_CHUNKS,
+          JSON.stringify(customChunks)
+        );
+      }
+    } catch {
+      // ignore
+    }
   }
-  saveChunks(next);
-  return next;
+  return loadChunks();
 }
 
 export function deleteChunkById(id: string): ChunkItem[] {
-  const current = loadChunks().filter((c) => c.id !== id);
-  saveChunks(current);
-  return current;
+  if (typeof window !== "undefined") {
+    try {
+      const deletedRaw = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
+      const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem(
+          STORAGE_KEYS.DELETED_IDS,
+          JSON.stringify(deletedIds)
+        );
+      }
+      const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+      if (customRaw) {
+        const customChunks: ChunkItem[] = JSON.parse(customRaw);
+        localStorage.setItem(
+          STORAGE_KEYS.CUSTOM_CHUNKS,
+          JSON.stringify(customChunks.filter((c) => c.id !== id))
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return loadChunks();
 }
 
 export function resetToSeedChunks(): ChunkItem[] {
-  saveChunks(INITIAL_SEED_CHUNKS);
   if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEYS.CUSTOM_CHUNKS);
+    localStorage.removeItem(STORAGE_KEYS.CHUNK_DELTAS);
+    localStorage.removeItem(STORAGE_KEYS.DELETED_IDS);
     localStorage.removeItem(STORAGE_KEYS.LOGS);
   }
-  return INITIAL_SEED_CHUNKS;
+  return getAllPresetChunks();
 }
 
 export function loadReviewLogs(): ReviewLog[] {
@@ -550,9 +664,11 @@ export function loadUserProfile(): UserProfile {
   if (typeof window === "undefined") return DEFAULT_USER_PROFILE;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    return raw
-      ? { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) }
-      : DEFAULT_USER_PROFILE;
+    if (!raw) return DEFAULT_USER_PROFILE;
+    const parsed = JSON.parse(raw);
+    // セキュリティ保護: ブラウザの localStorage には API キーを保持しない
+    delete parsed.geminiApiKey;
+    return { ...DEFAULT_USER_PROFILE, ...parsed };
   } catch {
     return DEFAULT_USER_PROFILE;
   }
@@ -560,5 +676,7 @@ export function loadUserProfile(): UserProfile {
 
 export function saveUserProfile(profile: UserProfile): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  const safeProfile = { ...profile };
+  delete safeProfile.geminiApiKey;
+  localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(safeProfile));
 }
