@@ -1,11 +1,13 @@
 "use client";
 
-import { ChunkItem, ReviewLog, UserProfile } from "@/types/sep";
+import { ChunkItem, LearningSetId, ReviewLog, UserProfile } from "@/types/sep";
+import { PRESET_LEARNING_SETS_CHUNKS } from "@/lib/data/learning-sets";
 
 const STORAGE_KEYS = {
   CHUNKS: "sep_chunks_v1",
   LOGS: "sep_review_logs_v1",
   PROFILE: "sep_user_profile_v1",
+  ACTIVE_SET: "sep_active_set_v1",
 };
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
@@ -474,29 +476,67 @@ export const INITIAL_SEED_CHUNKS: ChunkItem[] = [
   },
 ];
 
+export function getAllPresetChunks(): ChunkItem[] {
+  return [
+    ...PRESET_LEARNING_SETS_CHUNKS.PEL,
+    ...PRESET_LEARNING_SETS_CHUNKS.ACL,
+    ...PRESET_LEARNING_SETS_CHUNKS.AFL,
+    ...PRESET_LEARNING_SETS_CHUNKS.PVPL,
+  ];
+}
+
 export function loadChunks(): ChunkItem[] {
-  if (typeof window === "undefined") return INITIAL_SEED_CHUNKS;
+  if (typeof window === "undefined") return getAllPresetChunks();
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CHUNKS);
     if (!raw) {
-      localStorage.setItem(
-        STORAGE_KEYS.CHUNKS,
-        JSON.stringify(INITIAL_SEED_CHUNKS)
-      );
-      return INITIAL_SEED_CHUNKS;
+      const presets = getAllPresetChunks();
+      localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(presets));
+      return presets;
     }
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) && parsed.length > 0
       ? parsed
-      : INITIAL_SEED_CHUNKS;
+      : getAllPresetChunks();
   } catch {
-    return INITIAL_SEED_CHUNKS;
+    return getAllPresetChunks();
   }
 }
 
 export function saveChunks(chunks: ChunkItem[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.CHUNKS, JSON.stringify(chunks));
+}
+
+export function importLearningSet(setId: LearningSetId): ChunkItem[] {
+  const current = loadChunks();
+  const toImport = PRESET_LEARNING_SETS_CHUNKS[setId] || [];
+  
+  // 既存のIDと重複しないようにマージ、既存にあれば上書きまたは維持
+  const currentMap = new Map(current.map((c) => [c.chunkText.toLowerCase(), c]));
+  toImport.forEach((item) => {
+    if (!currentMap.has(item.chunkText.toLowerCase())) {
+      currentMap.set(item.chunkText.toLowerCase(), item);
+    }
+  });
+
+  const next = Array.from(currentMap.values());
+  saveChunks(next);
+  return next;
+}
+
+export function importAllLearningSets(): ChunkItem[] {
+  const all = getAllPresetChunks();
+  const current = loadChunks();
+  const currentMap = new Map(current.map((c) => [c.chunkText.toLowerCase(), c]));
+  all.forEach((item) => {
+    if (!currentMap.has(item.chunkText.toLowerCase())) {
+      currentMap.set(item.chunkText.toLowerCase(), item);
+    }
+  });
+  const next = Array.from(currentMap.values());
+  saveChunks(next);
+  return next;
 }
 
 export function upsertChunk(chunk: ChunkItem): ChunkItem[] {
@@ -520,11 +560,12 @@ export function deleteChunkById(id: string): ChunkItem[] {
 }
 
 export function resetToSeedChunks(): ChunkItem[] {
-  saveChunks(INITIAL_SEED_CHUNKS);
+  const presets = getAllPresetChunks();
+  saveChunks(presets);
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEYS.LOGS);
   }
-  return INITIAL_SEED_CHUNKS;
+  return presets;
 }
 
 export function loadReviewLogs(): ReviewLog[] {

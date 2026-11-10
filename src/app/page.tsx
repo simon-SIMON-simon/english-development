@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ChunkItem, ReviewLog, UserProfile } from "@/types/sep";
+import { ChunkItem, LearningSetId, ReviewLog, UserProfile } from "@/types/sep";
 import {
   loadChunks,
   upsertChunk,
@@ -11,12 +11,16 @@ import {
   appendReviewLog,
   loadUserProfile,
   saveUserProfile,
+  importLearningSet,
+  importAllLearningSets,
   DEFAULT_USER_PROFILE,
 } from "@/lib/store/sep-store";
+import { LEARNING_SETS_METADATA } from "@/lib/data/learning-sets";
 import Stage0Elaborator from "@/components/stage0/Stage0Elaborator";
 import Stage1Trainer from "@/components/stage1/Stage1Trainer";
 import Stage2Trainer from "@/components/stage2/Stage2Trainer";
 import Stage3Trainer from "@/components/stage3/Stage3Trainer";
+import LearningSetSelector from "@/components/learning-sets/LearningSetSelector";
 import {
   Zap,
   Sparkles,
@@ -28,11 +32,14 @@ import {
   Clock,
   CheckCircle2,
   RotateCcw,
+  BookMarked,
+  Layers,
 } from "lucide-react";
 
 type ActiveTab =
   | "dashboard"
   | "daily_workout"
+  | "learning_sets"
   | "stage0"
   | "stage1"
   | "stage2"
@@ -43,6 +50,7 @@ export default function SEPAppPage() {
   const [logs, setLogs] = useState<ReviewLog[]>([]);
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
+  const [selectedSetFilter, setSelectedSetFilter] = useState<LearningSetId | "ALL">("ALL");
 
   // Daily Workout (15-20 min 3-Phase Runner)
   const [workoutPhase, setWorkoutPhase] = useState<1 | 2 | 3>(1);
@@ -88,6 +96,23 @@ export default function SEPAppPage() {
     setLogs(nextLogs);
   };
 
+  const handleImportSet = (setId: LearningSetId) => {
+    const updated = importLearningSet(setId);
+    setChunks(updated);
+  };
+
+  const handleImportAllSets = () => {
+    const updated = importAllLearningSets();
+    setChunks(updated);
+  };
+
+  const handleStartWorkoutWithSet = (setId: LearningSetId) => {
+    setSelectedSetFilter(setId);
+    setWorkoutPhase(1);
+    setWorkoutElapsedSec(0);
+    setActiveTab("daily_workout");
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     const domains = domainsInput
@@ -104,17 +129,22 @@ export default function SEPAppPage() {
     setShowSettings(false);
   };
 
-  const stage1Count = chunks.filter((c) => c.stage === 1).length;
-  const stage2Count = chunks.filter((c) => c.stage === 2).length;
-  const stage3Count = chunks.filter((c) => c.stage === 3).length;
+  const filteredChunks =
+    selectedSetFilter === "ALL"
+      ? chunks
+      : chunks.filter((c) => c.sourceSet === selectedSetFilter);
+
+  const stage1Count = filteredChunks.filter((c) => c.stage === 1).length;
+  const stage2Count = filteredChunks.filter((c) => c.stage === 2).length;
+  const stage3Count = filteredChunks.filter((c) => c.stage === 3).length;
 
   const avgLatencyMs =
-    chunks.filter((c) => c.bestLatencyMs).length > 0
+    filteredChunks.filter((c) => c.bestLatencyMs).length > 0
       ? Math.round(
-          chunks
+          filteredChunks
             .filter((c) => c.bestLatencyMs)
             .reduce((acc, c) => acc + (c.bestLatencyMs || 0), 0) /
-            chunks.filter((c) => c.bestLatencyMs).length
+            filteredChunks.filter((c) => c.bestLatencyMs).length
         )
       : 1780;
 
@@ -178,6 +208,18 @@ export default function SEPAppPage() {
             >
               <Play className="w-3.5 h-3.5" />
               デイリーワークアウト (15分)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("learning_sets")}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition cursor-pointer ${
+                activeTab === "learning_sets"
+                  ? "bg-indigo-600 text-white"
+                  : "text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20"
+              }`}
+            >
+              <BookMarked className="w-3.5 h-3.5" />
+              学習セット (PEL/ACL/AFL/PVPL)
             </button>
             <button
               type="button"
@@ -281,6 +323,65 @@ export default function SEPAppPage() {
                     新規チャンク登録 (Stage 0)
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Learning Sets (PEL / ACL / AFL / PVPL) Quick Selector */}
+            <div className="rounded-2xl border border-indigo-500/30 bg-slate-900/80 p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5">
+                  <BookMarked className="w-5 h-5 text-indigo-400" />
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      4大学術コーパス学習セット（PEL / ACL / AFL / PVPL）
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      SLA（第二言語習得論）公認の重要句表現・コロケーション・定型句・句動詞セット
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("learning_sets")}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600/30 border border-indigo-500/40 px-4 py-2 text-xs font-bold text-indigo-200 hover:bg-indigo-600/50 cursor-pointer"
+                >
+                  学習セット一覧・インポート詳細へ
+                </button>
+              </div>
+
+              {/* Set Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs text-slate-400">対象セット絞り込み:</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSetFilter("ALL")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    selectedSetFilter === "ALL"
+                      ? "bg-white text-slate-950 shadow"
+                      : "bg-slate-800 text-slate-300 hover:text-white"
+                  }`}
+                >
+                  すべて ({chunks.length})
+                </button>
+                {(["PEL", "ACL", "AFL", "PVPL"] as LearningSetId[]).map((id) => {
+                  const meta = LEARNING_SETS_METADATA[id];
+                  const count = chunks.filter((c) => c.sourceSet === id).length;
+                  const active = selectedSetFilter === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSelectedSetFilter(id)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition cursor-pointer ${
+                        active
+                          ? `${meta.badgeColor} ring-1 ring-white/30`
+                          : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {id}: {meta.nameJa.replace(/リスト|セット/g, "")} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -445,6 +546,20 @@ export default function SEPAppPage() {
         )}
 
         {/* =============================================================== */}
+        {/* TAB: LEARNING SETS (PEL / ACL / AFL / PVPL) */}
+        {/* =============================================================== */}
+        {activeTab === "learning_sets" && (
+          <LearningSetSelector
+            currentChunks={chunks}
+            selectedSetFilter={selectedSetFilter}
+            onSelectSetFilter={setSelectedSetFilter}
+            onImportSet={handleImportSet}
+            onImportAllSets={handleImportAllSets}
+            onStartWorkoutWithSet={handleStartWorkoutWithSet}
+          />
+        )}
+
+        {/* =============================================================== */}
         {/* TAB 2: DAILY WORKOUT (Phase 1 -> Phase 2 -> Phase 3 Runner) */}
         {/* =============================================================== */}
         {activeTab === "daily_workout" && (
@@ -496,15 +611,22 @@ export default function SEPAppPage() {
                 ))}
               </div>
 
-              <div className="font-mono text-sm text-cyan-300 flex items-center gap-1.5">
-                <Clock className="w-4 h-4" />
-                経過: {formatTime(workoutElapsedSec)} / 目安 15:00
+              <div className="flex items-center gap-4">
+                {selectedSetFilter !== "ALL" && (
+                  <span className="text-xs font-bold rounded-lg px-2.5 py-1 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300">
+                    対象セット: {selectedSetFilter}
+                  </span>
+                )}
+                <div className="font-mono text-sm text-cyan-300 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4" />
+                  経過: {formatTime(workoutElapsedSec)} / 目安 15:00
+                </div>
               </div>
             </div>
 
             {workoutPhase === 1 && (
               <Stage1Trainer
-                chunks={chunks}
+                chunks={filteredChunks}
                 onChunkUpdated={handleChunkUpdated}
                 onPhaseComplete={() => setWorkoutPhase(2)}
               />
@@ -512,7 +634,7 @@ export default function SEPAppPage() {
 
             {workoutPhase === 2 && (
               <Stage2Trainer
-                chunks={chunks}
+                chunks={filteredChunks}
                 profile={profile}
                 onChunkUpdated={handleChunkUpdated}
                 onPhaseComplete={() => setWorkoutPhase(3)}
@@ -520,7 +642,7 @@ export default function SEPAppPage() {
             )}
 
             {workoutPhase === 3 && (
-              <Stage3Trainer chunks={chunks} profile={profile} />
+              <Stage3Trainer chunks={filteredChunks} profile={profile} />
             )}
           </div>
         )}
@@ -539,21 +661,21 @@ export default function SEPAppPage() {
 
         {activeTab === "stage1" && (
           <Stage1Trainer
-            chunks={chunks}
+            chunks={filteredChunks}
             onChunkUpdated={handleChunkUpdated}
           />
         )}
 
         {activeTab === "stage2" && (
           <Stage2Trainer
-            chunks={chunks}
+            chunks={filteredChunks}
             profile={profile}
             onChunkUpdated={handleChunkUpdated}
           />
         )}
 
         {activeTab === "stage3" && (
-          <Stage3Trainer chunks={chunks} profile={profile} />
+          <Stage3Trainer chunks={filteredChunks} profile={profile} />
         )}
       </main>
 

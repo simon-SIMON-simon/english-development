@@ -40,7 +40,26 @@
 
 ---
 
-## 3. デイリーワークアウトの流れ（1日15〜20分完結）
+## 3. 標準搭載：4大学術コーパス学習セット
+
+応用言語学・第二言語習得論（SLA）における著名な4大標準コーパスリストを学習セットとしてプリセット搭載しています。各セットは語源・視覚イメージ・自己参照文脈（二重符号化）および音声変化解説（IPA・リンキング）が完備されており、個別インポートまたは一括インポートが可能です。
+
+1. **Phrasal Expressions List (PEL)** (Martinez & Schmitt, 2012)
+   - ネイティブスピーカーの巨大コーパス（BNC）から抽出された最重要定型表現（505表現）。単語単体ではなく慣用連語として自動化することで、リスニングの知覚負荷を劇的に低減。
+   - 例: `in the light of`, `with regard to the`, `in conjunction with`, `to a large extent`, `at the expense of`
+2. **Academic Collocation List (ACL)** (Ackermann & Chen, Pearson, 2013)
+   - 学術・知的ビジネス議論において必須となる最重要コロケーション（2,469組）。動詞・名詞・形容詞の自然な共起パターンを手続き記憶化。
+   - 例: `draw a clear distinction between`, `cast serious doubt on`, `shed new light on`, `strike a delicate balance between`, `yield tangible results in`
+3. **Academic Formulas List (AFL)** (Simpson-Vlach & Ellis, 2010)
+   - 学術スピーキングおよびライティングにおいて論理展開・立場表明・議論接続を司る定型フォーミュラ（談話標識）。
+   - 例: `it should be noted that`, `on the basis of`, `there is no doubt that`, `as can be seen from`, `it is worth pointing out that`
+4. **Phrasal Verb Pedagogical List (PVPL)** (Garnier & Schmitt, 2015)
+   - 現代英語で最も頻出かつ不可欠な150の句動詞とそのコア意味を網羅。口語やビジネス対話における瞬時の知覚・発話を鍛錬。
+   - 例: `carry out rigorous testing`, `point out the inconsistency in`, `set up a scalable architecture`, `figure out the root cause`, `rule out the possibility of`
+
+---
+
+## 4. デイリーワークアウトの流れ（1日15〜20分完結）
 
 1. **Phase 1: 瞬間検索スプリント（4分）** ── Stage 1の聴覚・発話フラッシュカード（3000msミリ秒計測）
 2. **Phase 2: 記事リスニング & マイクロ短文生成（6分）** ── Stage 2の1.2倍速多聴・ディクテーション・自己文脈短文添削

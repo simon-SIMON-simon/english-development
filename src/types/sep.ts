@@ -2,6 +2,18 @@ export type StageNumber = 0 | 1 | 2 | 3;
 
 export type FSRSRating = 1 | 2 | 3 | 4; // 1: Again, 2: Hard, 3: Good, 4: Easy
 
+export type LearningSetId = "PEL" | "ACL" | "AFL" | "PVPL" | "CUSTOM";
+
+export interface LearningSetMeta {
+  id: LearningSetId;
+  name: string;
+  nameJa: string;
+  descriptionJa: string;
+  academicCitation: string;
+  badgeColor: string;
+  itemCount: number;
+}
+
 export interface ChunkEtymology {
   prefix: string;
   root: string;
@@ -37,6 +49,7 @@ export interface ChunkItem {
   chunkText: string;
   meaningJa: string;
   stage: StageNumber;
+  sourceSet?: LearningSetId;
   stability: number; // FSRS S (記憶安定度: 日数)
   difficulty: number; // FSRS D (1.0 - 10.0)
   reps: number;
